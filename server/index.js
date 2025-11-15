@@ -2,13 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { Queue } from 'bullmq';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { HuggingFaceInferenceEmbeddings } from '@langchain/community/embeddings/hf';
 import { QdrantVectorStore } from '@langchain/qdrant';
 import OpenAI from 'openai';
+import 'dotenv/config';
 
 const client = new OpenAI({
-  apiKey: '',
+  baseURL: 'https://api.groq.com/openai/v1',
+  apiKey: process.env.GROQ_API_KEY || '', 
 });
+
 const queue = new Queue('file-upload-queue', {
   connection: {
     host: 'localhost',
@@ -50,10 +53,11 @@ app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
 app.get('/chat', async (req, res) => {
   const userQuery = req.query.message;
 
-  const embeddings = new OpenAIEmbeddings({
-    model: 'text-embedding-3-small',
-    apiKey: '',
+  const embeddings = new HuggingFaceInferenceEmbeddings({
+    model: 'sentence-transformers/all-MiniLM-L6-v2', 
+    // Optional: apiKey: process.env.HUGGINGFACE_API_KEY, // Only if using private models
   });
+
   const vectorStore = await QdrantVectorStore.fromExistingCollection(
     embeddings,
     {
@@ -72,8 +76,9 @@ app.get('/chat', async (req, res) => {
   ${JSON.stringify(result)}
   `;
 
+
   const chatResult = await client.chat.completions.create({
-    model: 'gpt-4.1',
+    model: 'llama-3.1-70b-versatile', 
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userQuery },

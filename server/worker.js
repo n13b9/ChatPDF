@@ -1,9 +1,8 @@
 import { Worker } from 'bullmq';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { HuggingFaceInferenceEmbeddings } from '@langchain/community/embeddings/hf';
 import { QdrantVectorStore } from '@langchain/qdrant';
-import { Document } from '@langchain/core/documents';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
-import { CharacterTextSplitter } from '@langchain/textsplitters';
+import 'dotenv/config';
 
 const worker = new Worker(
   'file-upload-queue',
@@ -14,7 +13,7 @@ const worker = new Worker(
     Path: data.path
     read the pdf from path,
     chunk the pdf,
-    call the openai embedding model for every chunk,
+    call the free hugging face embedding model for every chunk,
     store the chunk in qdrant db
     */
 
@@ -22,9 +21,10 @@ const worker = new Worker(
     const loader = new PDFLoader(data.path);
     const docs = await loader.load();
 
-    const embeddings = new OpenAIEmbeddings({
-      model: 'text-embedding-3-small',
-      apiKey: '',
+  
+    const embeddings = new HuggingFaceInferenceEmbeddings({
+      model: 'sentence-transformers/all-MiniLM-L6-v2', 
+      // Optional: apiKey: process.env.HUGGINGFACE_API_KEY, // Only if using private models
     });
 
     const vectorStore = await QdrantVectorStore.fromExistingCollection(
