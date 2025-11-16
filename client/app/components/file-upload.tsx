@@ -1,39 +1,51 @@
-'use client';
-import * as React from 'react';
-import { Upload } from 'lucide-react';
+"use client";
+
+import * as React from "react";
+import { Upload } from "lucide-react";
 
 const FileUploadComponent: React.FC = () => {
-  const handleFileUploadButtonClick = () => {
-    const el = document.createElement('input');
-    el.setAttribute('type', 'file');
-    el.setAttribute('accept', 'application/pdf');
-    el.addEventListener('change', async (ev) => {
-      if (el.files && el.files.length > 0) {
-        const file = el.files.item(0);
-        if (file) {
-          const formData = new FormData();
-          formData.append('pdf', file);
+  const handleFileUpload = () => {
+    const el = document.createElement("input");
+    el.type = "file";
+    el.accept = "application/pdf";
 
-          await fetch('http://localhost:8000/upload/pdf', {
-            method: 'POST',
-            body: formData,
-          });
-          console.log('File uploaded');
-        }
-      }
-    });
+    el.onchange = async () => {
+      const file = el.files?.[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("pdf", file);
+
+      await fetch("http://localhost:8000/upload/pdf", {
+        method: "POST",
+        body: formData,
+      });
+
+      console.log("Uploaded");
+    };
+
     el.click();
   };
 
   return (
-    <div className="bg-slate-900 text-white shadow-2xl flex justify-center items-center p-4 rounded-lg border-white border-2">
-      <div
-        onClick={handleFileUploadButtonClick}
-        className="flex justify-center items-center flex-col"
-      >
-        <h3>Upload PDF File</h3>
-        <Upload />
-      </div>
+    <div
+      onClick={handleFileUpload}
+      className="
+        cursor-pointer w-full max-w-sm mx-auto
+        bg-white border border-gray-200 rounded-2xl
+        shadow-sm hover:shadow-md transition
+        p-8 text-center
+      "
+    >
+      <Upload className="w-10 h-10 text-gray-500 mx-auto mb-4" />
+
+      <h3 className="text-lg font-semibold text-gray-800">
+        Upload PDF File
+      </h3>
+
+      <p className="text-sm text-gray-500 mt-1">
+        Click to choose a file
+      </p>
     </div>
   );
 };

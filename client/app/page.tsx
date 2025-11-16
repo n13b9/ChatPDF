@@ -1,15 +1,23 @@
-import FileUploadComponent from './components/file-upload';
-import ChatComponent from './components/chat';
+import FileUploadComponent from "./components/file-upload";
+import ChatComponent from "./components/chat";
+
 export default function Home() {
   return (
-    <div>
-      <div className="min-h-screen w-screen flex">
-        <div className="w-[30vw] min-h-screen p-4 flex justify-center items-center">
+    <div className="min-h-screen w-full bg-gradient-to-b from-[#f9fafb] to-[#eef1f5] p-10">
+
+      {/* CENTERED WORKSPACE */}
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        {/* LEFT PANEL */}
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 h-fit">
           <FileUploadComponent />
         </div>
-        <div className="w-[70vw] min-h-screen border-l-2">
+
+        {/* RIGHT PANEL */}
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 h-[80vh] flex flex-col">
           <ChatComponent />
         </div>
+
       </div>
     </div>
   );
