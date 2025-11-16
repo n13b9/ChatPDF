@@ -1,94 +1,88 @@
-import express from 'express';
-import cors from 'cors';
-import multer from 'multer';
-import { Queue } from 'bullmq';
-import { HuggingFaceInferenceEmbeddings } from '@langchain/community/embeddings/hf';
-import { QdrantVectorStore } from '@langchain/qdrant';
-import OpenAI from 'openai';
-import 'dotenv/config';
+import express from "express";
+import cors from "cors";
+import multer from "multer";
+import { Queue } from "bullmq";
+import { QdrantClient } from "@qdrant/js-client-rest";
+import OpenAI from "openai";
+import Groq from "groq-sdk";
+import "dotenv/config";
 
-const client = new OpenAI({
-  baseURL: 'https://api.groq.com/openai/v1',
-  apiKey: process.env.GROQ_API_KEY || '', 
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+const qdrant = new QdrantClient({
+  url: process.env.QDRANT_URL,
+  apiKey: process.env.QDRANT_API_KEY,
 });
 
-const queue = new Queue('file-upload-queue', {
-  connection: {
-    host: 'localhost',
-    port: '6379',
-  },
+const queue = new Queue("file-upload-queue", {
+  connection: { host: "localhost", port: 6379 },
 });
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/');
+    cb(null, "uploads/");
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `${unique}-${file.originalname}`);
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
 const app = express();
 app.use(cors());
 
-app.get('/', (req, res) => {
-  return res.json({ status: 'All Good!' });
+app.get("/", (req, res) => {
+  return res.json({ status: "All Good!" });
 });
 
-app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
+app.post("/upload/pdf", upload.single("pdf"), async (req, res) => {
   await queue.add(
-    'file-ready',
+    "file-ready",
     JSON.stringify({
       filename: req.file.originalname,
       destination: req.file.destination,
       path: req.file.path,
     })
   );
-  return res.json({ message: 'uploaded' });
+  return res.json({ message: "uploaded" });
 });
 
-app.get('/chat', async (req, res) => {
+app.get("/chat", async (req, res) => {
   const userQuery = req.query.message;
 
-  const embeddings = new HuggingFaceInferenceEmbeddings({
-    model: 'sentence-transformers/all-MiniLM-L6-v2', 
-    // Optional: apiKey: process.env.HUGGINGFACE_API_KEY, // Only if using private models
+  const embedding = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: userQuery,
   });
 
-  const vectorStore = await QdrantVectorStore.fromExistingCollection(
-    embeddings,
-    {
-      url: 'http://localhost:6333',
-      collectionName: 'langchainjs-testing',
-    }
-  );
-  const ret = vectorStore.asRetriever({
-    k: 2,
+  const vector = embedding.data[0].embedding;
+
+  const search = await qdrant.query("langchainjs-testing", {
+    vector,
+    top: 3,
   });
-  const result = await ret.invoke(userQuery);
 
-  const SYSTEM_PROMPT = `
-  You are helfull AI Assistant who answeres the user query based on the available context from PDF File.
-  Context:
-  ${JSON.stringify(result)}
-  `;
+  const SYSTEM = `
+You are a helpful assistant. Use only the context to answer.
+Context:
+${JSON.stringify(search)}
+`;
 
-
-  const chatResult = await client.chat.completions.create({
-    model: 'llama-3.1-70b-versatile', 
+  const chat = await groq.chat.completions.create({
+    model: "llama-3.1-70b-versatile",
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userQuery },
+      { role: "system", content: SYSTEM },
+      { role: "user", content: userQuery },
     ],
   });
 
   return res.json({
-    message: chatResult.choices[0].message.content,
-    docs: result,
+    message: chat.choices[0].message.content,
+    docs: search,
   });
 });
 
-app.listen(8000, () => console.log(`Server started on PORT:${8000}`));
+app.listen(8000, () => console.log(`Server started on PORT:8000`));
